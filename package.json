@@ -45,7 +45,8 @@
     "start:main": "cross-env NODE_ENV=development electronmon -r ts-node/register/transpile-only .",
     "start:preload": "cross-env NODE_ENV=development TS_NODE_TRANSPILE_ONLY=true webpack --config ./.erb/configs/webpack.config.preload.dev.ts",
     "start:renderer": "cross-env NODE_ENV=development TS_NODE_TRANSPILE_ONLY=true webpack serve --config ./.erb/configs/webpack.config.renderer.dev.ts",
-    "test": "jest"
+    "test": "jest",
+    "tailwind": "npx tailwindcss -i ./src/renderer/App.css -o ./dist/output.css --watch"
   },
   "browserslist": [],
   "prettier": {
@@ -156,6 +157,7 @@
     "sass": "^1.62.1",
     "sass-loader": "^13.3.1",
     "style-loader": "^3.3.3",
+    "tailwindcss": "^3.3.3",
     "terser-webpack-plugin": "^5.3.9",
     "ts-jest": "^29.1.0",
     "ts-loader": "^9.4.3",
