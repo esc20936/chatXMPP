@@ -14,6 +14,7 @@ import { autoUpdater } from 'electron-updater';
 import log from 'electron-log';
 import MenuBuilder from './menu';
 import { resolveHtmlPath } from './util';
+import Connect from './XMPP/Connect';
 
 class AppUpdater {
   constructor() {
@@ -73,11 +74,15 @@ const createWindow = async () => {
     show: false,
     width: 1024,
     height: 728,
+    minWidth: 1024,
+    minHeight: 728,
+    fullscreenable: true,
     icon: getAssetPath('icon.png'),
     webPreferences: {
       preload: app.isPackaged
         ? path.join(__dirname, 'preload.js')
         : path.join(__dirname, '../../.erb/dll/preload.js'),
+        devTools: false,
     },
   });
 
@@ -135,3 +140,20 @@ app
     });
   })
   .catch(console.log);
+
+
+
+  // METHODS
+const connect = new Connect();
+
+
+ipcMain.on('login', (event, arg) => {
+  console.log(arg);
+  login(arg.username, arg.password);
+});
+
+
+
+const login = (username: string, password: string) => {
+   connect.login(username, password);
+}
