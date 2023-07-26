@@ -9,3 +9,40 @@ body,html, #root {
   width: 100vw;
   background-color: black;
 }
+
+/* scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+
+.colorText {
+  background: linear-gradient(
+    90deg,
+    rgb(57, 255, 215) 0%,
+    rgba(126, 157, 255, 1) 33%,
+    rgba(239, 100, 255, 1) 50%,
+    rgba(126, 157, 255, 1) 67%,
+    rgb(68, 246, 255) 100%
+  );
+
+  background-size: 300%;
+  text-transform: uppercase;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: animated_text 7s ease-in-out infinite;
+  -moz-animation: animated_text 7s ease-in-out infinite;
+  -webkit-animation: animated_text 7s ease-in-out infinite;
+}
+
+@keyframes animated_text {
+  0% {
+    background-position: 0px 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0px 50%;
+  }
+}
