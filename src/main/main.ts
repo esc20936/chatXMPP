@@ -78,16 +78,21 @@ const createWindow = async () => {
     minHeight: 728,
     fullscreenable: true,
     icon: getAssetPath('icon.png'),
+    titleBarStyle: 'hidden',
+    titleBarOverlay: {
+      color: '#1d1d1d',
+      symbolColor: '#6b8afd',
+      
+    },
     webPreferences: {
       preload: app.isPackaged
         ? path.join(__dirname, 'preload.js')
         : path.join(__dirname, '../../.erb/dll/preload.js'),
-        devTools: false,
+      // devTools: false,
     },
   });
 
   mainWindow.loadURL(resolveHtmlPath('index.html'));
-
   mainWindow.on('ready-to-show', () => {
     if (!mainWindow) {
       throw new Error('"mainWindow" is not defined');
@@ -105,6 +110,19 @@ const createWindow = async () => {
 
   const menuBuilder = new MenuBuilder(mainWindow);
   menuBuilder.buildMenu();
+
+  const connect = new Connect(mainWindow);
+
+  // METHODS
+
+  ipcMain.on('login', (event, arg) => {
+    console.log(arg);
+    login(arg.username, arg.password);
+  });
+
+  const login = (username: string, password: string) => {
+    connect.login(username, password);
+  };
 
   // Open urls in the user's browser
   mainWindow.webContents.setWindowOpenHandler((edata) => {
@@ -140,20 +158,3 @@ app
     });
   })
   .catch(console.log);
-
-
-
-  // METHODS
-const connect = new Connect();
-
-
-ipcMain.on('login', (event, arg) => {
-  console.log(arg);
-  login(arg.username, arg.password);
-});
-
-
-
-const login = (username: string, password: string) => {
-   connect.login(username, password);
-}
