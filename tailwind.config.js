@@ -11,7 +11,8 @@ module.exports = {
         lightColor: "#ffffff",
         textWhiteColor : "#e5e5e6",
         hoverAccentColor: "#5c7cfa",
-        discordPurple: "#404EED"
+        discordPurple: "#404EED",
+        errorMessage: "#ff0000",
       },
       height:{
         "screen-1/16": "6.25vh",
