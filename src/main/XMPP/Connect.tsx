@@ -1,6 +1,6 @@
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 const net = require('net');
-const { client, xml } = require('@xmpp/client');
+const { client, xml, jid } = require('@xmpp/client');
 import {
   app,
   Menu,
@@ -158,6 +158,11 @@ export default class Connect {
       console.log('Solicitud de amistad recibida de: ', from);
     }
 
+
+
+
+
+
     // resultados IQ
     if (stanza.is('iq') && stanza.attrs.type === 'result') {
       const query = stanza.getChild('query', 'jabber:iq:roster');
@@ -168,15 +173,14 @@ export default class Connect {
 
     if (stanza.is('message') && stanza.attrs.type === 'chat') {
       const from = stanza.attrs.from;
-      const body = stanza.getChildText('body');
+      let body = stanza.getChildText('body');
       const subject = stanza.getChildText('subject');
 
-      if (body.includes('file://')) {
+      if (from && body && subject && (subject.includes('Archivo:') || subject.includes('File:'))){
         console.log('Archivo recibido');
         const fileName = subject.slice(subject.indexOf(':') + 1).trim();
-        const base64Data = body.slice(7); // Eliminar "file://"
-        const filePath = `./${fileName}`; // Cambiar la ruta según tu necesidad
-
+        const base64Data = body.slice(7); 
+        const filePath = `./${fileName}`; 
         // Convertir base64 a archivo y guardarlo
         await this.saveBase64ToFile(base64Data, filePath);
 
@@ -187,13 +191,31 @@ export default class Connect {
         });
 
         // console.log(`Archivo recibido de ${from}: ${filePath}`);
+      
       } else {
         // send message to chat
-        this.mainWindow.webContents.send('message_received', {
-          from: from,
-          body: body,
-          subject: subject,
-        });
+        console.log('Mensaje recibido');
+        if(body.includes("file://")){
+          console.log('Archivo recibido');
+          const base64Data = body.slice(7); 
+          const filePath = `./DOWNLOAD`; 
+          await this.saveBase64ToFile(base64Data, filePath);
+          console.log(base64Data.substring(0, 100));
+          console.log(`Archivo recibido de ${from}: ${filePath}`);
+          this.mainWindow.webContents.send('message_received', {
+            from: from,
+            body: "rand says: \nArchivo recibido y guardado en\n" + filePath,
+            subject: subject,
+          });
+
+        }else{
+          console.log(body)
+          this.mainWindow.webContents.send('message_received', {
+            from: from,
+            body: body,
+            subject: subject,
+          });
+        }
       }
     }
   }
@@ -204,7 +226,6 @@ export default class Connect {
     this.xmppClient
       .send(presence)
       .then(() => {
-        console.log(`Solicitud de suscripción enviada a ${username}`);
 
         // send success to chat contacts
         this.mainWindow.webContents.send(
@@ -213,7 +234,6 @@ export default class Connect {
         );
       })
       .catch((err: any) => {
-        console.error('Error al enviar la solicitud de suscripción:', err);
 
         // send error to chat contacts
         this.mainWindow.webContents.send(
@@ -258,9 +278,8 @@ export default class Connect {
       xml('body', {}, message)
     );
 
-    console.log(rq);
 
-    // Enviar el mensaje al contacto
+    // Enviar el mensaje al contactoc;casdas
     await this.xmppClient.send(rq);
   }
 
@@ -292,7 +311,7 @@ export default class Connect {
 
     // get filename from path
     const filename = path.split('\\').pop().split('/').pop();
-    console.log(filename);
+    
     const message = xml(
       'message',
       { type: 'chat', to: JID },
@@ -300,7 +319,6 @@ export default class Connect {
       xml('subject', {}, `Archivo: ${filename}`)
     );
 
-    console.log(message);
 
     // Enviar el mensaje al contacto
     await this.xmppClient.send(message);
