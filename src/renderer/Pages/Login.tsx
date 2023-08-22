@@ -23,7 +23,7 @@ export default function Login() {
   };
 
   const handleCreateAccount = () => {
-    
+    navigate('/create-account');
   };
 
   useEffect(() => {
@@ -93,7 +93,9 @@ export default function Login() {
           {/* create account */}
           <div className="flex flex-row items-center justify-center mt-8">
             <p className="text-white/50">Don't have an account?</p>
-            <button className="ml-2 text-white transition duration-100 ease-in-out focus:ring-0 focus:outline-none hover:text-hoverAccentColor ">
+            <button className="ml-2 text-white transition duration-100 ease-in-out focus:ring-0 focus:outline-none hover:text-hoverAccentColor "
+              onClick={handleCreateAccount}
+            >
               Create one
             </button>
           </div>

@@ -9,14 +9,13 @@ import {
   MenuItemConstructorOptions,
 } from 'electron';
 
-
 export default class Connect {
   private server: string = 'alumchat.xyz';
   private port: number = 5222;
-  private socket: any;
   private service: string = 'xmpp://alumchat.xyz:5222';
   private xmppClient: any;
 
+  private arrayRequests: string[] = [];
 
   mainWindow: BrowserWindow;
 
@@ -24,10 +23,7 @@ export default class Connect {
     this.mainWindow = mainWindow;
     console.log('Connect constructor');
     console.log(this.mainWindow);
-    
   }
-
-
 
   public login(username: string, password: string) {
     this.xmppClient = client({
@@ -36,6 +32,9 @@ export default class Connect {
       resource: '',
       username: username,
       password: password,
+      tls: {
+        rejectUnauthorized: false,
+      },
     });
 
     this.subscribeToEvents();
@@ -43,6 +42,68 @@ export default class Connect {
       console.log("Error: Couldn't connect to server");
       console.log(err);
     });
+  }
+
+  public register(username: string, password: string) {
+    const socket = net.createConnection(this.port, this.server, () => {
+      console.log('Connected to XMPP server');
+
+      // Send the initial XML stream headers
+      socket.write(
+        `<?xml version="1.0" encoding="UTF-8"?>` +
+          `<stream:stream xmlns="jabber:client" xmlns:stream="http://etherx.jabber.org/streams" to="${this.server}" version="1.0">`
+      );
+    });
+
+    socket.on('data', (data: any) => {
+      const response = data.toString();
+      console.log('Received:', response);
+
+      // if response contains iq type="result" id="reg1" then registration was successful
+      if (response.includes('iq type="result" id="reg1"')) {
+        console.log('Registration successful');
+        this.mainWindow.webContents.send(
+          'register_success',
+          'Registration successful'
+        );
+      } else if (response.includes('iq type="error" id="reg1"')) {
+        console.log('Registration failed');
+        this.mainWindow.webContents.send(
+          'register_failure',
+          'Registration failed'
+        );
+      }
+      // Process the received data
+      // ...
+
+      // Example: Send a registration request
+      if (response.includes('<stream:features>')) {
+        const registrationRequest = `<iq type="set" id="reg1">
+            <query xmlns="jabber:iq:register">
+              <username>${username}</username>
+              <password>${password}</password>
+            </query>
+          </iq>`;
+
+        socket.write(registrationRequest);
+      }
+    });
+  }
+
+  public getContacts() {
+    const rq = xml(
+      'iq',
+      { type: 'get', id: 'roster' },
+      xml('query', { xmlns: 'jabber:iq:roster' })
+    );
+
+    this.xmppClient
+      .send(rq)
+      .then((result: any) => {})
+      .catch((err: any) => {
+        // send error to chat contacts
+        console.log('Error: ', err);
+      });
   }
 
   private subscribeToEvents() {
@@ -59,7 +120,6 @@ export default class Connect {
     // online handling
     this.xmppClient.on('online', (address: any) => {
       this.onlineHandler(address);
-      
     });
 
     // stanza handling
@@ -72,15 +132,109 @@ export default class Connect {
     await this.xmppClient.send(xml('presence'));
     console.log('online as', address.toString());
     this.mainWindow.webContents.send('login_success', address.toString());
-    
+  }
+
+  private async saveBase64ToFile(base64Data, filePath) {
+    const fs = require('fs');
+    const fileData = Buffer.from(base64Data, 'base64');
+    await fs.promises.writeFile(filePath, fileData);
+    console.log(`Archivo guardado en: ${filePath}`);
   }
 
   private async stanzaHandler(stanza: any) {
-    if (stanza.is('message')) {
-      console.log('Received message: ' + stanza.getChildText('body'));
-    } else {
-      console.log('Received stanza: ', stanza.toString());
+    // if (stanza.is('message')) {
+    //   console.log('Received message: ' + stanza.getChildText('body'));
+    // } else {
+    //   console.log('Received stanza: ', stanza.toString());
+    // }
+
+    // Stanza is to subscribe
+    if (stanza.is('presence') && stanza.attrs.type === 'subscribe') {
+      const from = stanza.attrs.from;
+      // send request
+      this.mainWindow.webContents.send('request_received', from);
+
+      this.arrayRequests.push(from);
+      console.log('Solicitud de amistad recibida de: ', from);
     }
+
+    // resultados IQ
+    if (stanza.is('iq') && stanza.attrs.type === 'result') {
+      const query = stanza.getChild('query', 'jabber:iq:roster');
+      const contacts = query.getChildren('item');
+
+      this.mainWindow.webContents.send('getContacts_success', contacts);
+    }
+
+    if (stanza.is('message') && stanza.attrs.type === 'chat') {
+      const from = stanza.attrs.from;
+      const body = stanza.getChildText('body');
+      const subject = stanza.getChildText('subject');
+
+      if (body.includes('file://')) {
+        console.log('Archivo recibido');
+        const fileName = subject.slice(subject.indexOf(':') + 1).trim();
+        const base64Data = body.slice(7); // Eliminar "file://"
+        const filePath = `./${fileName}`; // Cambiar la ruta según tu necesidad
+
+        // Convertir base64 a archivo y guardarlo
+        await this.saveBase64ToFile(base64Data, filePath);
+
+        this.mainWindow.webContents.send('message_received', {
+          from: from,
+          body: 'Archivo recibido y guardado en\n' + filePath,
+          subject: subject,
+        });
+
+        // console.log(`Archivo recibido de ${from}: ${filePath}`);
+      } else {
+        // send message to chat
+        this.mainWindow.webContents.send('message_received', {
+          from: from,
+          body: body,
+          subject: subject,
+        });
+      }
+    }
+  }
+
+  public addContact(username: string) {
+    const presence = xml('presence', { to: username, type: 'subscribe' });
+
+    this.xmppClient
+      .send(presence)
+      .then(() => {
+        console.log(`Solicitud de suscripción enviada a ${username}`);
+
+        // send success to chat contacts
+        this.mainWindow.webContents.send(
+          'addContact_success',
+          `Solicitud de suscripción enviada a ${username}`
+        );
+      })
+      .catch((err: any) => {
+        console.error('Error al enviar la solicitud de suscripción:', err);
+
+        // send error to chat contacts
+        this.mainWindow.webContents.send(
+          'addContact_failure',
+          `Error al enviar la solicitud de suscripción: ${err}`
+        );
+      });
+  }
+
+  public getRequests() {
+    return this.arrayRequests;
+  }
+
+  public async acceptRequest(username: string) {
+    await this.xmppClient.send(
+      xml('presence', { to: username, type: 'subscribed' })
+    );
+    console.log(`Accepted subscription request from: ${username}`);
+
+    // remove from array
+    this.mainWindow.webContents.send('acceptRequest_success', username);
   }
 
   private errorHandler(err: any) {
@@ -92,21 +246,81 @@ export default class Connect {
     console.log('\n\n');
   }
 
+  public async sendMessage(
+    message: string,
+    to: string,
+    timeStamp: string,
+    fromLocal: boolean
+  ) {
+    const rq = xml(
+      'message',
+      { type: 'chat', to: to },
+      xml('body', {}, message)
+    );
+
+    console.log(rq);
+
+    // Enviar el mensaje al contacto
+    await this.xmppClient.send(rq);
+  }
+
+  public logout() {
+    this.xmppClient.stop();
+  }
 
   private errorManager(err: any) {
     switch (err.name) {
-      case "SASLError":
+      case 'SASLError':
         // No se pudo autenticar
         console.log("Error: Couldn't authenticate");
-        this.mainWindow.webContents.send('login_failure', "Couldn't authenticate");
+        this.mainWindow.webContents.send(
+          'login_failure',
+          "Couldn't authenticate"
+        );
         break;
     }
-
-
   }
 
+  public async sendFile(JID: string, path: string) {
+    // convert file to base64
+    path = path[0];
+    console.log(path);
+    console.log(JID);
+    const fs = require('fs');
+    const fileData = fs.readFileSync(path);
+    const base64Data = fileData.toString('base64');
 
+    // get filename from path
+    const filename = path.split('\\').pop().split('/').pop();
+    console.log(filename);
+    const message = xml(
+      'message',
+      { type: 'chat', to: JID },
+      xml('body', {}, `file://${base64Data}`),
+      xml('subject', {}, `Archivo: ${filename}`)
+    );
 
+    console.log(message);
+
+    // Enviar el mensaje al contacto
+    await this.xmppClient.send(message);
+
+    this.mainWindow.webContents.send('file_message_sent', {
+      body: 'FILE SENT',
+      to: JID,
+    });
+  }
+
+  public removeAccount() {
+    const rq = xml(
+      'iq',
+      { type: 'set', id: 'unreg1' },
+      xml('query', { xmlns: 'jabber:iq:register' }, xml('remove'))
+    );
+
+    // Enviando la stanza al servidor XMPP.
+    this.xmppClient.send(rq);
+  }
 
   private offlineHandler() {
     console.log('\n\n');

@@ -120,8 +120,103 @@ const createWindow = async () => {
     login(arg.username, arg.password);
   });
 
+  ipcMain.on('register', (event, arg) => {
+    console.log(arg);
+    register(arg.username, arg.password);
+  });
+
+
+
+  // EVENTS
+  // get contacts
+  ipcMain.on('getContacts', (event, arg) => {
+    console.log(arg);
+    console.log('getContacts');
+    connect.getContacts();
+  });
+
+  // add contact
+  ipcMain.on('addContact', (event, arg) => {
+    console.log(arg);
+    console.log('addContact');
+    connect.addContact(arg.username);
+  });
+
+  // get requests
+  ipcMain.on('getRequests', (event, arg) => {
+    console.log(arg);
+    console.log('getRequests');
+    let requests = connect.getRequests();
+    console.log(requests);
+    return requests;
+  });
+
+  // logout
+  ipcMain.on('logout', (event, arg) => {
+    console.log(arg);
+    console.log('logout');
+    connect.logout();
+  });
+
+
+  // accept request
+  ipcMain.on('acceptRequest', (event, arg) => {
+    console.log(arg);
+    console.log('acceptRequest');
+    connect.acceptRequest(arg.username);
+  });
+
+
+  // sendMessage
+  ipcMain.on('sendMessage', (event, arg) => {
+    console.log(arg);
+    console.log('sendMessage');
+    let { message, to, timeStamp, fromLocal} = arg;
+    connect.sendMessage(message, to, timeStamp, fromLocal);
+  });
+
+
+
+  // show info
+  ipcMain.on('showInfo', (event, arg) => {
+    console.log(arg);
+    console.log('showInfo');
+    // connect.showInfo(arg.JID);
+  });
+
+
+
+  // send file
+  ipcMain.on('sendFile', (event, arg) => {
+    const { dialog } = require('electron')
+    let { JID } = arg;
+    dialog.showOpenDialog({ properties: ['openFile', 'multiSelections'] }).then((result: any) => {
+      console.log(result.filePaths)
+      console.log('sendFile');
+      connect.sendFile(JID, result.filePaths);
+    }
+    ).catch((err: any) => {
+      console.log(err)
+    }
+    )
+  });
+
+
+  ipcMain.on("removeAccount", (event, arg) => {
+    console.log(arg);
+    console.log('removeAccount');
+    connect.removeAccount();
+
+  })  
+
+
+
   const login = (username: string, password: string) => {
     connect.login(username, password);
+  };
+
+  const register = (username: string, password: string) => {
+    connect.register(username, password);
   };
 
   // Open urls in the user's browser
