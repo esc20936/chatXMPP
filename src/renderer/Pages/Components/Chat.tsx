@@ -77,7 +77,7 @@ export default function Chat() {
               <Message
                 key={i}
                 fromLocal={e.fromLocal}
-                message={e.message}
+                message={e.message || e.body}
                 timeStamp={e.timeStamp}
                 from=""
               />

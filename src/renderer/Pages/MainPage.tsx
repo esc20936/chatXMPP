@@ -55,11 +55,13 @@ export default function MainPage() {
         console.log(message);
 
         // TODO: add notifications for each user.
-        let body = message.body;
+        let body = message.body || message.message;
 
-        // split using 'says: \n'
-        let split = body.split('says: \n');
-        body = split[1];
+        // split using 'says: \n' if contains
+        if (body.includes('says: \n')) {
+          let split = body.split('says: \n');
+          body = split[1];
+        }
 
         const newMessage = {
           fromLocal: false,

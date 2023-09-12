@@ -8,24 +8,52 @@ import {
   BrowserWindow,
   MenuItemConstructorOptions,
 } from 'electron';
+const Flooding = require('../../../Algorithms/flooding');
 
 export default class Connect {
   private server: string = 'alumchat.xyz';
   private port: number = 5222;
   private service: string = 'xmpp://alumchat.xyz:5222';
   private xmppClient: any;
-
+  private username: string;
+  private names = require('./names.json');
+  private topologia = require('./topo.json');
+  private topo: any;
+  private floodRouter: any;
   private arrayRequests: string[] = [];
-
+  private strategy: string = 'flooding';
   mainWindow: BrowserWindow;
 
   constructor(mainWindow: BrowserWindow) {
     this.mainWindow = mainWindow;
+    this.topo = this.createUpdatedTopology(this.names, this.topologia);
     console.log('Connect constructor');
     console.log(this.mainWindow);
   }
 
+  public createUpdatedTopology(nameMapping: any, originalTopology: any) {
+    const updatedTopology = { ...originalTopology };
+
+    for (const oldKey in nameMapping.config) {
+      const newKey = nameMapping.config[oldKey];
+      if (updatedTopology.config[oldKey]) {
+        updatedTopology.config[newKey] = updatedTopology.config[oldKey];
+        delete updatedTopology.config[oldKey];
+        updatedTopology.config[newKey] = updatedTopology.config[newKey].map(
+          (item) => {
+            return nameMapping.config[item] || item;
+          }
+        );
+      }
+    }
+
+    return updatedTopology;
+  }
+
   public login(username: string, password: string) {
+    this.username = username;
+    this.floodRouter = new Flooding(username + '@alumchat.xyz', this.topo);
+
     this.xmppClient = client({
       service: 'xmpp://alumchat.xyz:5222',
       domain: 'alumchat.xyz',
@@ -57,13 +85,13 @@ export default class Connect {
 
     socket.on('data', (data: any) => {
       const response = data.toString();
-     
+
       console.log('Received:', response);
 
       // if response contains iq type="result" id="reg1" then registration was successful
       if (response.includes('iq type="result" id="reg1"')) {
         console.log('Registration successful');
-       
+
         this.mainWindow.webContents.send(
           'register_success',
           'Registration successful'
@@ -77,7 +105,6 @@ export default class Connect {
 
         // fake print sending message to node pablo123@alumchat.xyv
         // passing by eduardo123@alumchat
-
       }
       // Process the received data
       // ...
@@ -148,13 +175,7 @@ export default class Connect {
   }
 
   private async stanzaHandler(stanza: any) {
-    // if (stanza.is('message')) {
-    //   console.log('Received message: ' + stanza.getChildText('body'));
-    // } else {
-    //   console.log('Received stanza: ', stanza.toString());
-    // }
-
-    // Stanza is to subscribe
+    
     if (stanza.is('presence') && stanza.attrs.type === 'subscribe') {
       const from = stanza.attrs.from;
       // send request
@@ -162,12 +183,9 @@ export default class Connect {
 
       this.arrayRequests.push(from);
       console.log('Solicitud de amistad recibida de: ', from);
+
+      return;
     }
-
-
-
-
-
 
     // resultados IQ
     if (stanza.is('iq') && stanza.attrs.type === 'result') {
@@ -175,6 +193,8 @@ export default class Connect {
       const contacts = query.getChildren('item');
 
       this.mainWindow.webContents.send('getContacts_success', contacts);
+      
+      return;
     }
 
     if (stanza.is('message') && stanza.attrs.type === 'chat') {
@@ -182,11 +202,16 @@ export default class Connect {
       let body = stanza.getChildText('body');
       const subject = stanza.getChildText('subject');
 
-      if (from && body && subject && (subject.includes('Archivo:') || subject.includes('File:'))){
+      if (
+        from &&
+        body &&
+        subject &&
+        (subject.includes('Archivo:') || subject.includes('File:'))
+      ) {
         console.log('Archivo recibido');
         const fileName = subject.slice(subject.indexOf(':') + 1).trim();
-        const base64Data = body.slice(7); 
-        const filePath = `./${fileName}`; 
+        const base64Data = body.slice(7);
+        const filePath = `./${fileName}`;
         // Convertir base64 a archivo y guardarlo
         await this.saveBase64ToFile(base64Data, filePath);
 
@@ -194,45 +219,133 @@ export default class Connect {
           from: from,
           body: 'Archivo recibido y guardado en\n' + filePath,
           subject: subject,
+          message: 'Archivo recibido y guardado en\n' + filePath,
         });
 
         // console.log(`Archivo recibido de ${from}: ${filePath}`);
-      
       } else {
         // send message to chat
         console.log('Mensaje recibido');
-        if(body.includes("file://")){
+        if (body.includes('file://')) {
           console.log('Archivo recibido');
-          const base64Data = body.slice(7); 
-          const filePath = `./DOWNLOAD`; 
+          const base64Data = body.slice(7);
+          const filePath = `./DOWNLOAD`;
           await this.saveBase64ToFile(base64Data, filePath);
           console.log(base64Data.substring(0, 100));
           console.log(`Archivo recibido de ${from}: ${filePath}`);
           this.mainWindow.webContents.send('message_received', {
             from: from,
-            body: "rand says: \nArchivo recibido y guardado en\n" + filePath,
+            body: 'rand says: \nArchivo recibido y guardado en\n' + filePath,
             subject: subject,
+            message: 'Archivo recibido y guardado en\n' + filePath,
           });
+        } else {
+          console.log(body);
 
-        }else{
-          console.log(body)
+          // remove 'Echobot says:\n' from body
+          body = body.slice(14);
+
+          
+          let { type, headers, payload } = JSON.parse(body);
+          let newBody = payload;
+          console.log(newBody);
+
           this.mainWindow.webContents.send('message_received', {
             from: from,
-            body: body,
+            body: newBody,
             subject: subject,
+            message: newBody,
           });
         }
+      }
+      return;
+    }
+
+    if (stanza.is('message')) {
+      const { from, type } = stanza.attrs;
+      let p = stanza.getChildText('body');
+
+      //console.log("Message received from: ", from)
+      //console.log("Message: ", p)
+
+      if (!p) {
+        return;
+      }
+
+      p = JSON.parse(p);
+      //console.log(p.type)
+      if (p.type === 'echo') {
+        if (p.payload.timestamp2 === '') {
+          p.payload.timestamp2 = Date.now().toString();
+          this.xmppClient.send(
+            xml(
+              'message',
+              { to: from, type: 'chat' },
+              xml('body', {}, JSON.stringify(p))
+            )
+          );
+        } else {
+          console.log('RTT: ', p.payload.timestamp2 - p.payload.timestamp1);
+        }
+      } else if (p.type === 'message') {
+        if (this.strategy === 'flooding') {
+          const packet = this.floodRouter.flood(p);
+
+          if (packet) {
+            const neighbors = this.floodRouter.neighbors;
+
+            neighbors.forEach((n) => {
+              if (n === from) {
+                return;
+              }
+              this.xmppClient.send(
+                xml(
+                  'message',
+                  { to: n, type: 'chat' },
+                  xml('body', {}, JSON.stringify(packet))
+                )
+              );
+            });
+          }
+        }
+      } else if (p.type === 'topo') {
+        this.topo = this.createUpdatedTopology(this.names, p.config);
+        this.floodRouter.updateTopology(this.topo);
+      } else if (p.type === 'names') {
+        this.topo = this.createUpdatedTopology(p.config, this.topo);
+        this.floodRouter.updateTopology(this.topo);
       }
     }
   }
 
+  public sendEchoMessage(to: string) {
+    // destination should be a jid with @alumchat
+    const message = {
+      type: 'echo',
+      headers: {
+        from: this.username + '@alumchat.xyz',
+        to,
+      },
+      payload: {
+        timestamp1: Date.now().toString(),
+        timestamp2: '',
+      },
+    };
+
+    this.xmppClient.send(
+      xml(
+        'message',
+        { to, type: 'chat' },
+        xml('body', {}, JSON.stringify(message))
+      )
+    );
+  }
   public addContact(username: string) {
     const presence = xml('presence', { to: username, type: 'subscribe' });
 
     this.xmppClient
       .send(presence)
       .then(() => {
-
         // send success to chat contacts
         this.mainWindow.webContents.send(
           'addContact_success',
@@ -240,7 +353,6 @@ export default class Connect {
         );
       })
       .catch((err: any) => {
-
         // send error to chat contacts
         this.mainWindow.webContents.send(
           'addContact_failure',
@@ -278,15 +390,41 @@ export default class Connect {
     timeStamp: string,
     fromLocal: boolean
   ) {
-    const rq = xml(
-      'message',
-      { type: 'chat', to: to },
-      xml('body', {}, message)
-    );
+    if (this.strategy === 'flooding') {
+      const objectToSend = {
+        type: 'message',
+        headers: {
+          from: this.username + '@alumchat.xyz',
+          to,
+          hop_count: 0,
+        },
+        payload: message,
+      };
 
+      console.log("\n\n###################\n\n")
+      console.log("Enviando mensaje")
+      const vecinos = this.floodRouter.neighbors;
+      vecinos.forEach((n) => {
+        console.log(n);
+        this.xmppClient.send(
+          xml(
+            'message',
+            { to: n, type: 'chat' },
+            xml('body', {}, JSON.stringify(objectToSend))
+          )
+        );
+      });
 
-    // Enviar el mensaje al contactoc;casdas
-    await this.xmppClient.send(rq);
+    }
+
+    // const rq = xml(
+    //   'message',
+    //   { type: 'chat', to: to },
+    //   xml('body', {}, message)
+    // );
+
+    // // Enviar el mensaje al contactoc;casdas
+    // await this.xmppClient.send(rq);
   }
 
   public logout() {
@@ -317,14 +455,13 @@ export default class Connect {
 
     // get filename from path
     const filename = path.split('\\').pop().split('/').pop();
-    
+
     const message = xml(
       'message',
       { type: 'chat', to: JID },
       xml('body', {}, `file://${base64Data}`),
       xml('subject', {}, `Archivo: ${filename}`)
     );
-
 
     // Enviar el mensaje al contacto
     await this.xmppClient.send(message);

@@ -1,108 +1,49 @@
-const { readFile } = require("./loadSettings.js");
+class Flooding_Algorithm {
+  constructor(id, topology) {
+    this.id = id;
+    this.neighbors = topology.config[id];
+    console.log(
+      `Flooding node ${this.id} initialized with neighbors ${this.neighbors}`
+    );
+  }
 
-const flooding = async (graph, start, end, names, topo) => {
-    const queue = [];
-    const visited = new Set();
-    const shortestDistances = {};
-    const jumpCosts = {}; // Objeto para almacenar los costos por salto
+  newNeighbor(neighbor) {
+    if (!this.neighbors.includes(neighbor)) {
+      this.neighbors.push(neighbor);
+    }
+  }
 
-    queue.push(start);
-    visited.add(start);
-    shortestDistances[start] = { cost: 0 };
+  updateTopology(topology) {
+    this.neighbors = topology.config[this.id];
+  }
 
-    while (queue.length > 0) {
-        const vertex = queue.shift();
-
-        if (vertex === end) {
-            break;
-        }
-
-        const neighbors = graph[vertex];
-
-        for (let neighbor of neighbors) {
-            if (!visited.has(neighbor)) {
-                queue.push(neighbor);
-                visited.add(neighbor);
-
-                const costToVertex = shortestDistances[vertex].cost;
-                const costToNeighbor = shortestDistances[neighbor]?.cost || Infinity;
-
-                const newCostToNeighbor = costToVertex + 1;
-
-                if (newCostToNeighbor < costToNeighbor) {
-                    shortestDistances[neighbor] = { cost: newCostToNeighbor, from: vertex };
-                    jumpCosts[neighbor] = newCostToNeighbor; // Almacenar el costo por salto
-                }
-            }
-        }
+  flood(packet) {
+    if (packet.headers.to === this.id) {
+      console.log(`Packet received at ${this.id} from ${packet.headers.from}`);
+      console.log(`Packet payload: ${packet.payload}`);
+      return;
     }
 
-    if (!visited.has(end)) {
-        console.log("No se encontró un camino entre los nodos");
-        return;
+    if (packet.headers.hop_count > 10) {
+      console.log(
+        `Packet dropped from ${packet.headers.from} to ${this.id} (hop count exceeded)`
+      );
+      return;
     }
 
-    const path = tracePath(shortestDistances, start, end, names, topo);
-    const weight = shortestDistances[end].cost;
-
-    console.log("Camino encontrado:");
-    console.log(path.join(" -> "))
-    console.log("Camino más corto es:", path.join(" -> "), "con peso", weight);
-   
-    // Imprimir la tabla de costos por salto
-    console.log("Tabla de costos por salto:");
-    Object.keys(jumpCosts).forEach((vertex) => {
-        console.log(`${names[vertex]}: ${jumpCosts[vertex]}`);
-    });
-};
-
-const tracePath = (shortestDistances, start, end, names, topo) => {
-    const path = [];
-    const nodes = [];
-
-    let current = end;
-
-    while (current !== start) {
-        path.unshift(names[current]);
-        nodes.unshift(topo[current]);
-        current = shortestDistances[current].from;
+    if (this.neighbors.length === 0) {
+      console.log(
+        `Packet dropped from ${packet.headers.from} to ${this.id} (no neighbors)`
+      );
+      return;
     }
-    nodes.unshift(topo[start]);
-    path.unshift(names[start]);
-    return nodes, path;
-};
 
-const loadSettings = async () => {
-    try {
-        const topoContent = await readFile("./Settings/topo-demo.txt");
-        const topo = topoContent;
+    console.log(
+      `Flooding packet from ${packet.headers.from} to ${packet.headers.to} via ${this.id}`
+    );
+    packet.headers.hop_count++;
+    return packet;
+  }
+}
 
-        const namesContent = await readFile("./Settings/names-demo.txt");
-        const names = namesContent;
-
-        const graph = topo.config;
-        const namesConfig = names.config;
-
-        return { graph, namesConfig };
-    } catch (error) {
-        console.error("Error loading settings:", error);
-        throw error;
-    }
-};
-
-const startFlooding = async (from, to) => {
-    try {
-        const { graph, namesConfig } = await loadSettings();
-
-        if (graph[from] == undefined || graph[to] == undefined) {
-            console.log("from or to is not in the graph");
-            return;
-        }
-
-        await flooding(graph, from, to, namesConfig, graph);
-    } catch (error) {
-        console.error("Error starting flooding:", error);
-    }
-};
-
-startFlooding("A", "B");
+module.exports = Flooding_Algorithm;
