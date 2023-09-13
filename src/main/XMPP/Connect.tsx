@@ -57,11 +57,13 @@ export default class Connect {
 
     socket.on('data', (data: any) => {
       const response = data.toString();
+     
       console.log('Received:', response);
 
       // if response contains iq type="result" id="reg1" then registration was successful
       if (response.includes('iq type="result" id="reg1"')) {
         console.log('Registration successful');
+       
         this.mainWindow.webContents.send(
           'register_success',
           'Registration successful'
@@ -72,6 +74,10 @@ export default class Connect {
           'register_failure',
           'Registration failed'
         );
+
+        // fake print sending message to node pablo123@alumchat.xyv
+        // passing by eduardo123@alumchat
+
       }
       // Process the received data
       // ...

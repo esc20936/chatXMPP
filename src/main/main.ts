@@ -132,6 +132,13 @@ const createWindow = async () => {
   ipcMain.on('getContacts', (event, arg) => {
     console.log(arg);
     console.log('getContacts');
+    console.log(`Sending message to:`);
+    console.log(`pablo123@alumchat.xyz`);
+    console.log(`actualizacion de tabla`);
+    console.log(`actualizacion de tabla`);
+    console.log(`Sending message to:`);
+    console.log(`eduardo123@alumchat.xyz`);
+
     connect.getContacts();
   });
 
