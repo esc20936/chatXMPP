@@ -327,10 +327,11 @@ export default class Connect {
   public sendEchoMessage(to: string) {
     // destination should be a jid with @alumchat
     const message = {
-      type: 'echo',
+      type: 'message',
       headers: {
         from: this.username + '@alumchat.xyz',
         to,
+        hop_count: 0,
       },
       payload: {
         timestamp1: Date.now().toString(),
@@ -338,13 +339,31 @@ export default class Connect {
       },
     };
 
-    this.xmppClient.send(
-      xml(
-        'message',
-        { to, type: 'chat' },
-        xml('body', {}, JSON.stringify(message))
-      )
-    );
+    // {
+//   type: 'message',
+//   headers: {
+//     from: 'rio20979@alumchat.xyz',
+//     to: 'ram19946@alumchat.xyz',
+//     hop_count: 1
+//   },
+//   payload: 'hello wn'
+// }
+    
+
+    const neighbors = this.floodRouter.neighbors;
+    console.log(neighbors)
+    neighbors.forEach((n) => {
+      if (n === this.username) {
+        return;
+      }
+      this.xmppClient.send(
+        xml(
+          'message',
+          { to: n, type: 'chat' },
+          xml('body', {}, JSON.stringify(message))
+        )
+      );
+    });
   }
   public addContact(username: string) {
     const presence = xml('presence', { to: username, type: 'subscribe' });
