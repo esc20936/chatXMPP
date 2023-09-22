@@ -21,7 +21,7 @@ const tracePath = (table, start, end, names) => {
   }
   path = path.map((v) => names[v]);
   return path;
-};
+    };
 
 const formatGraph = (g) => {
   const tmp = {};

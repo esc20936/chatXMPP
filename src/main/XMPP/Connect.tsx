@@ -243,29 +243,19 @@ export default class Connect {
           console.log(body);
 
           // remove 'Echobot says:\n' from body
-          body = body.slice(14);
+          if(body.includes('Echobot says:\n'))
+          {
+            body = body.slice(14);
+          }
+          // body = body.slice(14);
 
-          
-          let { type, headers, payload } = JSON.parse(body);
-          let newBody = payload;
-          console.log(newBody);
+          console.log(body)
+          // let { type, headers, payload } = JSON.parse(body);
+          // let newBody = payload;
+          // console.log(newBody);
 
-          this.mainWindow.webContents.send('message_received', {
-            from: from,
-            body: newBody,
-            subject: subject,
-            message: newBody,
-          });
-        }
-      }
-      return;
-    }
-
-    if (stanza.is('message')) {
-      const { from, type } = stanza.attrs;
+          const { from, type } = stanza.attrs;
       let p = stanza.getChildText('body');
-
-      //console.log("Message received from: ", from)
       //console.log("Message: ", p)
 
       if (!p) {
@@ -292,8 +282,9 @@ export default class Connect {
           const packet = this.floodRouter.flood(p);
 
           if (packet) {
+            console.log('Packet: ', packet);
             const neighbors = this.floodRouter.neighbors;
-
+            console.log(neighbors)
             neighbors.forEach((n) => {
               if (n === from) {
                 return;
@@ -315,6 +306,21 @@ export default class Connect {
         this.topo = this.createUpdatedTopology(p.config, this.topo);
         this.floodRouter.updateTopology(this.topo);
       }
+
+
+          this.mainWindow.webContents.send('message_received', {
+            from: from,
+            body: p,
+            subject: subject,
+            message: p,
+          });
+        }
+      }
+      return;
+    }
+
+    if (stanza.is('message')) {
+      
     }
   }
 
